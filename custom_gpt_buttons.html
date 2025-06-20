@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Custom GPT Camera Buttons</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        video {
+            width: 90%;
+            max-width: 480px;
+            border: 2px solid black;
+            border-radius: 8px;
+        }
+
+        #response {
+            margin-top: 20px;
+            white-space: pre-wrap;
+            text-align: left;
+            max-width: 800px;
+            margin-inline: auto;
+        }
+
+        textarea,
+        input,
+        button,
+        select {
+            padding: 8px;
+            font-size: 1em;
+            margin: 5px;
+            width: 90%;
+            max-width: 800px;
+        }
+
+        .custom-btn-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .custom-btn-row input,
+        .custom-btn-row textarea {
+            width: auto;
+        }
+
+        footer {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #f8f8f8;
+            border-top: 1px solid #ccc;
+            padding: 10px 0;
+            text-align: center;
+            font-size: 0.95em;
+            color: #444;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Custom Camera-to-GPT Buttons</h1>
+    <p>Definisci i tuoi pulsanti: scegli il nome, il prompt e invia la foto a ChatGPT o Azure!</p>
+
+    <h2>Impostazioni</h2>
+    <div style="margin-bottom:1em;">
+        <label for="gptService">Service:</label>
+        <select id="gptService">
+            <option value="chatgpt" selected>ChatGPT</option>
+            <option value="azure">Azure GPT</option>
+        </select>
+    </div>
+    <div id="chatgptFields">
+        <input type="password" id="apiKey" placeholder="OpenAI API Key">
+    </div>
+    <div id="azureFields" style="display:none;">
+        <input type="password" id="azureApiKey" placeholder="Azure OpenAI API Key">
+        <input type="password" id="azureEndpoint" placeholder="Azure OpenAI Endpoint">
+    </div>
+
+    <div style="margin-bottom:1em;">
+        <label for="cameraSelect">Camera:</label>
+        <select id="cameraSelect"></select>
+        <button id="refreshCamerasBtn">Aggiorna fotocamere</button>
+    </div>
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div style="margin-bottom:1em;">
+      <label for="systemPrompt"><b>System prompt comune:</b></label><br>
+      <textarea id="systemPrompt" rows="2" placeholder="System prompt da inviare a GPT" style="width:90%;max-width:800px;"></textarea>
+    </div>
+
+    <h2>Pulsanti personalizzati</h2>
+    <div id="customButtons"></div>
+    <h3>Crea nuovo pulsante</h3>
+    <form id="newButtonForm" style="margin-bottom:2em;">
+        <div class="custom-btn-row">
+            <input id="newBtnName" placeholder="Nome pulsante" required>
+            <textarea id="newBtnPrompt" placeholder="Prompt da inviare a GPT" rows="2" required></textarea>
+            <button type="submit">Aggiungi</button>
+        </div>
+    </form>
+
+    <h2>Risposta</h2>
+    <div id="response"></div>
+    <div id="debugPrompt" style="margin-top:10px; color:#888; font-size:0.95em; white-space:pre-wrap;"></div>
+
+    <script>
+        // --- Camera logic ---
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const cameraSelect = document.getElementById('cameraSelect');
+        let currentStream = null;
+        async function listCameras() {
+            try { await navigator.mediaDevices.getUserMedia({ video: true }); } catch (e) { }
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            cameraSelect.innerHTML = '';
+            if (videoDevices.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.text = 'Nessuna fotocamera trovata';
+                cameraSelect.appendChild(option);
+                return;
+            }
+            videoDevices.forEach((device, idx) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Fotocamera ${idx + 1}`;
+                cameraSelect.appendChild(option);
+            });
+        }
+        async function startCamera(deviceId) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            const constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } } };
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                currentStream = stream;
+            } catch (err) {
+                alert('Camera access denied: ' + err);
+            }
+        }
+        cameraSelect.addEventListener('change', function () {
+            localStorage.setItem('selectedCamera', this.value);
+            startCamera(this.value);
+        });
+        document.getElementById('refreshCamerasBtn').onclick = async () => {
+            await listCameras();
+        };
+        // On load
+        navigator.mediaDevices.getUserMedia({ video: true }).then(() => {
+            listCameras().then(() => {
+                const savedCamera = localStorage.getItem('selectedCamera');
+                if (savedCamera && Array.from(cameraSelect.options).some(opt => opt.value === savedCamera)) {
+                    cameraSelect.value = savedCamera;
+                    startCamera(savedCamera);
+                } else if (cameraSelect.options.length > 0) {
+                    startCamera(cameraSelect.value);
+                }
+            });
+        });
+
+        // --- GPT Service selection logic ---
+        const gptServiceSelect = document.getElementById('gptService');
+        const chatgptFields = document.getElementById('chatgptFields');
+        const azureFields = document.getElementById('azureFields');
+        // Salva/ripristina scelta GPT service SOLO in localStorage
+        gptServiceSelect.value = localStorage.getItem('gptService') || 'chatgpt';
+        function updateGptFieldsVisibility() {
+            const value = gptServiceSelect.value;
+            chatgptFields.style.display = value === 'chatgpt' ? '' : 'none';
+            azureFields.style.display = value === 'azure' ? '' : 'none';
+        }
+        updateGptFieldsVisibility();
+        gptServiceSelect.addEventListener('change', function () {
+            localStorage.setItem('gptService', this.value);
+            updateGptFieldsVisibility();
+        });
+
+        // Salva/ripristina API key e endpoint SOLO in localStorage
+        const apiKeyInput = document.getElementById('apiKey');
+        const azureApiKeyInput = document.getElementById('azureApiKey');
+        const azureEndpointInput = document.getElementById('azureEndpoint');
+        apiKeyInput.value = localStorage.getItem('apiKey') || '';
+        azureApiKeyInput.value = localStorage.getItem('azureApiKey') || '';
+        azureEndpointInput.value = localStorage.getItem('azureEndpoint') || '';
+        apiKeyInput.addEventListener('input', function(e) {
+          localStorage.setItem('apiKey', e.target.value);
+        });
+        azureApiKeyInput.addEventListener('input', function(e) {
+          localStorage.setItem('azureApiKey', e.target.value);
+        });
+        azureEndpointInput.addEventListener('input', function(e) {
+          localStorage.setItem('azureEndpoint', e.target.value);
+        });
+
+        // --- Custom Buttons Logic ---
+        const customButtonsDiv = document.getElementById('customButtons');
+        const newButtonForm = document.getElementById('newButtonForm');
+        let customButtons = JSON.parse(localStorage.getItem('customButtons') || '[]');
+        function saveCustomButtons() {
+            localStorage.setItem('customButtons', JSON.stringify(customButtons));
+        }
+        function renderCustomButtons() {
+            customButtonsDiv.innerHTML = '';
+            customButtons.forEach((btn, idx) => {
+                const row = document.createElement('div');
+                row.className = 'custom-btn-row';
+                row.style.alignItems = 'center';
+                row.style.display = 'flex';
+                row.style.gap = '8px';
+                row.style.marginBottom = '8px';
+                row.style.flexWrap = 'wrap';
+                row.style.justifyContent = 'flex-start';
+                const button = document.createElement('button');
+                button.textContent = btn.name;
+                button.onclick = () => handleCustomButton(btn.prompt);
+                button.style.width = '140px';
+                button.style.minWidth = '140px';
+                button.style.textAlign = 'center';
+                button.style.fontWeight = 'bold';
+                row.appendChild(button);
+                const promptPreview = document.createElement('span');
+                promptPreview.textContent = btn.prompt.length > 60 ? btn.prompt.slice(0,60)+'...' : btn.prompt;
+                promptPreview.style.fontSize = '0.9em';
+                promptPreview.style.color = '#888';
+                row.appendChild(promptPreview);
+                // Bottone modifica
+                const editBtn = document.createElement('button');
+                editBtn.textContent = '✏️';
+                editBtn.title = 'Modifica';
+                editBtn.style.width = '32px';
+                editBtn.style.minWidth = '32px';
+                editBtn.style.height = '32px';
+                editBtn.style.padding = '2px 4px';
+                editBtn.style.fontSize = '1em';
+                editBtn.style.verticalAlign = 'middle';
+                editBtn.onclick = () => {
+                  // Mostra form di modifica inline
+                  row.innerHTML = '';
+                  const nameInput = document.createElement('input');
+                  nameInput.value = btn.name;
+                  nameInput.style.width = '120px';
+                  const promptInput = document.createElement('textarea');
+                  promptInput.value = btn.prompt;
+                  promptInput.rows = 2;
+                  promptInput.style.width = '250px';
+                  const saveBtn = document.createElement('button');
+                  saveBtn.textContent = 'Salva';
+                  saveBtn.onclick = () => {
+                    const newName = nameInput.value.trim();
+                    const newPrompt = promptInput.value.trim();
+                    if (!newName || !newPrompt) return;
+                    btn.name = newName;
+                    btn.prompt = newPrompt;
+                    saveCustomButtons();
+                    renderCustomButtons();
+                  };
+                  const cancelBtn = document.createElement('button');
+                  cancelBtn.textContent = 'Annulla';
+                  cancelBtn.onclick = () => renderCustomButtons();
+                  row.appendChild(nameInput);
+                  row.appendChild(promptInput);
+                  row.appendChild(saveBtn);
+                  row.appendChild(cancelBtn);
+                };
+                row.appendChild(editBtn);
+                // Bottone elimina
+                const delBtn = document.createElement('button');
+                delBtn.textContent = '🗑️';
+                delBtn.title = 'Elimina';
+                delBtn.style.width = '32px';
+                delBtn.style.minWidth = '32px';
+                delBtn.style.height = '32px';
+                delBtn.style.padding = '2px 4px';
+                delBtn.style.fontSize = '1em';
+                delBtn.style.verticalAlign = 'middle';
+                delBtn.onclick = () => {
+                  customButtons.splice(idx,1);
+                  saveCustomButtons();
+                  renderCustomButtons();
+                };
+                row.appendChild(delBtn);
+                customButtonsDiv.appendChild(row);
+            });
+        }
+        newButtonForm.onsubmit = function (e) {
+            e.preventDefault();
+            const name = document.getElementById('newBtnName').value.trim();
+            const prompt = document.getElementById('newBtnPrompt').value.trim();
+            if (!name || !prompt) return;
+            customButtons.push({ name, prompt });
+            saveCustomButtons();
+            renderCustomButtons();
+            newButtonForm.reset();
+        };
+        renderCustomButtons();
+
+        // --- GPT Request Logic ---
+        async function sendGptRequest({ gptService, apiKey, endpoint, systemPrompt, userContent, maxTokens = 300 }) {
+            let result, data;
+            if (gptService === 'chatgpt') {
+                result = await fetch("https://api.openai.com/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + apiKey
+                    },
+                    body: JSON.stringify({
+                        model: "gpt-4o",
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userContent }
+                        ],
+                        max_tokens: maxTokens
+                    })
+                });
+                data = await result.json();
+            } else {
+                result = await fetch(endpoint, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "api-key": apiKey
+                    },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userContent }
+                        ],
+                        max_tokens: maxTokens
+                    })
+                });
+                data = await result.json();
+            }
+            return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content.trim() : '';
+        }
+        const responseDiv = document.getElementById('response');
+        const debugPrompt = document.getElementById('debugPrompt');
+        // --- System prompt personalizzato ---
+        const systemPromptInput = document.getElementById('systemPrompt');
+        // Carica da localStorage
+        systemPromptInput.value = localStorage.getItem('systemPrompt') || "Sei un assistente visivo che aiuta l'utente a interpretare immagini tramite GPT.";
+        systemPromptInput.addEventListener('input', function() {
+          localStorage.setItem('systemPrompt', this.value);
+        });
+        async function handleCustomButton(prompt) {
+            const gptService = document.getElementById('gptService').value;
+            let apiKey = '', endpoint = '';
+            if (gptService === 'chatgpt') {
+                apiKey = document.getElementById('apiKey').value.trim();
+                if (!apiKey) {
+                    alert("Inserisci la OpenAI API key.");
+                    return;
+                }
+            } else {
+                apiKey = document.getElementById('azureApiKey').value.trim();
+                endpoint = document.getElementById('azureEndpoint').value.trim();
+                if (!apiKey || !endpoint) {
+                    alert("Inserisci la Azure API key e l'endpoint.");
+                    return;
+                }
+            }
+            // Scatta foto
+            const context = canvas.getContext("2d");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL("image/jpeg");
+            responseDiv.innerText = "Elaborazione in corso...";
+            // Prompt system personalizzato
+            const systemPrompt = systemPromptInput.value.trim() || "Sei un assistente visivo che aiuta l'utente a interpretare immagini tramite GPT.";
+            // Prompt utente personalizzato
+            const userContent = [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: imageData } }
+            ];
+            debugPrompt.innerText = `System prompt:\n${systemPrompt}\n\nUser message content:\n` + userContent.map(part => part.type === 'text' ? part.text : '[image]').join('\n---\n');
+            const resultText = await sendGptRequest({ gptService, apiKey, endpoint, systemPrompt, userContent });
+            if (!resultText) {
+                responseDiv.innerText = 'Nessuna risposta valida da ' + (gptService === 'chatgpt' ? 'OpenAI.' : 'Azure.');
+            } else {
+                responseDiv.innerText = resultText;
+            }
+        }
+
+        // --- Esporta/Importa configurazione bottoni personalizzati ---
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = 'Esporta configurazione';
+        exportBtn.style.margin = '5px';
+        exportBtn.onclick = function() {
+          const exportObj = {
+            systemPrompt: systemPromptInput.value,
+            buttons: customButtons
+          };
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+          const dlAnchor = document.createElement('a');
+          dlAnchor.setAttribute("href", dataStr);
+          dlAnchor.setAttribute("download", "custom_gpt_buttons.json");
+          document.body.appendChild(dlAnchor);
+          dlAnchor.click();
+          document.body.removeChild(dlAnchor);
+        };
+        const importBtn = document.createElement('button');
+        importBtn.textContent = 'Importa configurazione';
+        importBtn.style.margin = '5px';
+        const importInput = document.createElement('input');
+        importInput.type = 'file';
+        importInput.accept = '.json,application/json';
+        importInput.style.display = 'none';
+        importBtn.onclick = function() {
+          importInput.click();
+        };
+        importInput.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function(evt) {
+            try {
+              const imported = JSON.parse(evt.target.result);
+              if (imported && Array.isArray(imported.buttons) && imported.buttons.every(b => b.name && b.prompt)) {
+                customButtons = imported.buttons;
+                saveCustomButtons();
+                renderCustomButtons();
+                if (typeof imported.systemPrompt === 'string') {
+                  systemPromptInput.value = imported.systemPrompt;
+                  localStorage.setItem('systemPrompt', imported.systemPrompt);
+                }
+                alert('Configurazione importata con successo!');
+              } else if (Array.isArray(imported) && imported.every(b => b.name && b.prompt)) {
+                // Supporta vecchio formato solo array
+                customButtons = imported;
+                saveCustomButtons();
+                renderCustomButtons();
+                alert('Configurazione importata (vecchio formato)!');
+              } else {
+                alert('File non valido.');
+              }
+            } catch (err) {
+              alert('Errore durante l\'importazione: ' + err.message);
+            }
+            importInput.value = '';
+          };
+          reader.readAsText(file);
+        };
+        // Inserisci i pulsanti sopra la lista dei bottoni personalizzati
+        customButtonsDiv.parentNode.insertBefore(exportBtn, customButtonsDiv);
+        customButtonsDiv.parentNode.insertBefore(importBtn, customButtonsDiv);
+        document.body.appendChild(importInput);
+    </script>
+    <footer style="position:fixed;left:0;right:0;bottom:0;background:#f8f8f8;border-top:1px solid #ccc;padding:10px 0;text-align:center;font-size:0.95em;color:#444;z-index:1000;">
+      <b>Privacy Notice:</b> ASPHI Onlus, who hosts this page, never receives or stores any user data. All data remains in your browser and is only sent directly to the selected AI service (OpenAI or Azure) when you make a request.
+    </footer>
+</body>
+
+</html>
