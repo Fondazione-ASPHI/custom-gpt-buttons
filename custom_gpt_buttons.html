@@ -24,6 +24,22 @@
             text-align: left;
             max-width: 800px;
             margin-inline: auto;
+            min-height: 2.5em;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 2em;
+            height: 2em;
+            border: 0.3em solid #ccc;
+            border-top: 0.3em solid #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         textarea,
@@ -407,9 +423,12 @@
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = canvas.toDataURL("image/jpeg");
             // Accessibilità: resetta focus e annuncia lo stato
-            responseDiv.innerText = "Elaborazione in corso...";
+            // Spinner visivo e feedback accessibile
+            responseDiv.innerHTML = '<span class="spinner" aria-hidden="true"></span>';
             responseDiv.setAttribute('aria-busy', 'true');
             responseDiv.setAttribute('tabindex', '-1');
+            responseDiv.setAttribute('aria-label', 'Elaborazione in corso');
+            responseDiv.setAttribute('aria-live', 'polite');
             responseDiv.focus();
             // Prompt system personalizzato
             const systemPrompt = systemPromptInput.value.trim() || "Sei un assistente visivo che aiuta l'utente a interpretare immagini tramite GPT.";
@@ -423,6 +442,7 @@
             responseDiv.setAttribute('aria-busy', 'false');
             if (!resultText) {
                 responseDiv.innerText = 'Nessuna risposta valida da ' + (gptService === 'chatgpt' ? 'OpenAI.' : 'Azure.');
+                responseDiv.setAttribute('aria-label', responseDiv.innerText);
             } else {
                 // Inserisci la risposta in modo accessibile
                 // Sostituisci i ritorni a capo con <br> per screen reader e mantieni la formattazione
@@ -430,8 +450,9 @@
                   .replace(/</g, '&lt;')
                   .replace(/>/g, '&gt;')
                   .replace(/\n/g, '<br>');
+                responseDiv.setAttribute('aria-label', resultText);
             }
-            // Forza il focus per l'annuncio immediato da parte di screen reader
+            responseDiv.setAttribute('aria-live', 'assertive');
             responseDiv.focus();
         }
 
