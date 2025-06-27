@@ -3,161 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Gestione Configurazioni - Custom GPT Camera Buttons</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #fff;
-      color: #2C2735;
-      margin: 0;
-      padding: 0 0 80px 0;
-    }
-    h1, h2 {
-      color: #E85D26;
-      text-align: center;
-    }
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .config-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 24px;
-      justify-content: center;
-    }
-    .config-card {
-      background: #f8f8f8;
-      border: 2px solid #E85D26;
-      border-radius: 10px;
-      padding: 18px 16px 12px 16px;
-      min-width: 260px;
-      max-width: 320px;
-      box-shadow: 0 2px 8px #0001;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .config-title {
-      font-size: 1.2em;
-      font-weight: bold;
-      color: #2C2735;
-      margin-bottom: 2px;
-    }
-    .config-desc {
-      font-size: 0.98em;
-      color: #444;
-      margin-bottom: 8px;
-    }
-    .config-btns-list {
-      margin: 0 0 8px 0;
-      padding: 0;
-      list-style: none;
-    }
-    .config-btns-list li {
-      background: #fff;
-      border: 1px solid #E85D26;
-      border-radius: 4px;
-      margin-bottom: 4px;
-      padding: 4px 8px;
-      color: #2C2735;
-      font-size: 0.97em;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .config-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      position: absolute;
-      top: 10px;
-      right: 10px;
-    }
-    .dots-menu {
-      background: none;
-      border: none;
-      font-size: 1.5em;
-      color: #2C2735;
-      cursor: pointer;
-      padding: 2px 6px;
-      border-radius: 50%;
-      transition: background 0.2s;
-    }
-    .dots-menu:focus, .dots-menu:hover {
-      background: #E85D26;
-      color: #fff;
-      outline: 2px solid #2C2735;
-    }
-    .menu-popup {
-      position: absolute;
-      top: 32px;
-      right: 0;
-      background: #fff;
-      border: 1px solid #E85D26;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px #0002;
-      z-index: 10;
-      min-width: 120px;
-      display: none;
-    }
-    .menu-popup.active {
-      display: block;
-    }
-    .menu-popup button {
-      width: 100%;
-      background: none;
-      border: none;
-      color: #2C2735;
-      padding: 8px 12px;
-      text-align: left;
-      font-size: 1em;
-      cursor: pointer;
-      border-radius: 0;
-    }
-    .menu-popup button:hover, .menu-popup button:focus {
-      background: #E85D26;
-      color: #fff;
-    }
-    .import-btn {
-      margin: 0 0 24px 0;
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-    }
-    .import-btn input[type="file"] {
-      display: none;
-    }
-    .back-btn {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .back-btn button {
-      background: #E85D26;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 1em;
-      transition: background 0.2s;
-    }
-    .back-btn button:hover, .back-btn button:focus {
-      background: #b43e13;
-      outline: 2px solid #2C2735;
-    }
-    @media (max-width: 600px) {
-      .config-list {
-        flex-direction: column;
-        align-items: center;
-      }
-      .config-card {
-        min-width: 90vw;
-        max-width: 98vw;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <h1>Le mie configurazioni</h1>
@@ -172,6 +18,9 @@
     <h2>Configurazioni salvate</h2>
     <div class="config-list" id="configList"></div>
   </div>
+  <footer>
+    <b>Privacy Notice:</b> ASPHI Onlus, who hosts this page, never receives or stores any user data. All data remains in your browser and is only sent directly to the selected AI service (OpenAI or Azure) when you make a request.
+  </footer>
   <script>
     // Utilità per gestire le configurazioni salvate in localStorage
     function getSavedConfigs() {
