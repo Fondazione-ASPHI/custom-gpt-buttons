@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestione Configurazioni - Custom GPT Camera Buttons</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #fff;
+      color: #2C2735;
+      margin: 0;
+      padding: 0 0 80px 0;
+    }
+    h1, h2 {
+      color: #E85D26;
+      text-align: center;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .config-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+    }
+    .config-card {
+      background: #f8f8f8;
+      border: 2px solid #E85D26;
+      border-radius: 10px;
+      padding: 18px 16px 12px 16px;
+      min-width: 260px;
+      max-width: 320px;
+      box-shadow: 0 2px 8px #0001;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .config-title {
+      font-size: 1.2em;
+      font-weight: bold;
+      color: #2C2735;
+      margin-bottom: 2px;
+    }
+    .config-desc {
+      font-size: 0.98em;
+      color: #444;
+      margin-bottom: 8px;
+    }
+    .config-btns-list {
+      margin: 0 0 8px 0;
+      padding: 0;
+      list-style: none;
+    }
+    .config-btns-list li {
+      background: #fff;
+      border: 1px solid #E85D26;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      padding: 4px 8px;
+      color: #2C2735;
+      font-size: 0.97em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .config-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+    .dots-menu {
+      background: none;
+      border: none;
+      font-size: 1.5em;
+      color: #2C2735;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+    .dots-menu:focus, .dots-menu:hover {
+      background: #E85D26;
+      color: #fff;
+      outline: 2px solid #2C2735;
+    }
+    .menu-popup {
+      position: absolute;
+      top: 32px;
+      right: 0;
+      background: #fff;
+      border: 1px solid #E85D26;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px #0002;
+      z-index: 10;
+      min-width: 120px;
+      display: none;
+    }
+    .menu-popup.active {
+      display: block;
+    }
+    .menu-popup button {
+      width: 100%;
+      background: none;
+      border: none;
+      color: #2C2735;
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 0;
+    }
+    .menu-popup button:hover, .menu-popup button:focus {
+      background: #E85D26;
+      color: #fff;
+    }
+    .import-btn {
+      margin: 0 0 24px 0;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .import-btn input[type="file"] {
+      display: none;
+    }
+    .back-btn {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .back-btn button {
+      background: #E85D26;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.2s;
+    }
+    .back-btn button:hover, .back-btn button:focus {
+      background: #b43e13;
+      outline: 2px solid #2C2735;
+    }
+    @media (max-width: 600px) {
+      .config-list {
+        flex-direction: column;
+        align-items: center;
+      }
+      .config-card {
+        min-width: 90vw;
+        max-width: 98vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Le mie configurazioni</h1>
+  <div class="container">
+    <div class="back-btn">
+      <button onclick="window.location.href='custom_gpt_buttons.html'">← Torna alla pagina principale</button>
+    </div>
+    <div class="import-btn">
+      <button id="importConfigBtn" type="button">Importa configurazione</button>
+      <input id="importConfigInput" type="file" accept=".json,application/json" />
+    </div>
+    <h2>Configurazioni salvate</h2>
+    <div class="config-list" id="configList"></div>
+  </div>
+  <script>
+    // Utilità per gestire le configurazioni salvate in localStorage
+    function getSavedConfigs() {
+      return JSON.parse(localStorage.getItem('savedConfigs') || '[]');
+    }
+    function saveConfigs(configs) {
+      localStorage.setItem('savedConfigs', JSON.stringify(configs));
+    }
+    // Carica configurazioni e aggiorna la lista
+    function renderConfigs() {
+      const configs = getSavedConfigs();
+      const list = document.getElementById('configList');
+      list.innerHTML = '';
+      configs.forEach((cfg, idx) => {
+        const card = document.createElement('div');
+        card.className = 'config-card';
+        // Titolo
+        const title = document.createElement('div');
+        title.className = 'config-title';
+        title.textContent = cfg.title || 'Senza titolo';
+        card.appendChild(title);
+        // Descrizione
+        if (cfg.desc) {
+          const desc = document.createElement('div');
+          desc.className = 'config-desc';
+          desc.textContent = cfg.desc;
+          card.appendChild(desc);
+        }
+        // Elenco bottoni
+        const btnList = document.createElement('ul');
+        btnList.className = 'config-btns-list';
+        (cfg.buttons || []).slice(0,3).forEach(btn => {
+          const li = document.createElement('li');
+          li.textContent = btn.name || '(senza nome)';
+          btnList.appendChild(li);
+        });
+        card.appendChild(btnList);
+        // Azioni (3 pallini)
+        const actions = document.createElement('div');
+        actions.className = 'config-actions';
+        const dotsBtn = document.createElement('button');
+        dotsBtn.className = 'dots-menu';
+        dotsBtn.innerHTML = '&#x22EE;';
+        dotsBtn.title = 'Opzioni';
+        dotsBtn.onclick = (e) => {
+          e.stopPropagation();
+          document.querySelectorAll('.menu-popup').forEach(m => m.classList.remove('active'));
+          menu.classList.toggle('active');
+        };
+        actions.appendChild(dotsBtn);
+        // Menu popup
+        const menu = document.createElement('div');
+        menu.className = 'menu-popup';
+        // Esporta
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = 'Esporta';
+        exportBtn.onclick = (e) => {
+          e.stopPropagation();
+          const exportObj = {
+            systemPrompt: cfg.systemPrompt,
+            buttons: cfg.buttons
+          };
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+          const dlAnchor = document.createElement('a');
+          dlAnchor.setAttribute("href", dataStr);
+          dlAnchor.setAttribute("download", (cfg.title || 'configurazione') + '.json');
+          document.body.appendChild(dlAnchor);
+          dlAnchor.click();
+          document.body.removeChild(dlAnchor);
+          menu.classList.remove('active');
+        };
+        menu.appendChild(exportBtn);
+        // Carica
+        const loadBtn = document.createElement('button');
+        loadBtn.textContent = 'Carica';
+        loadBtn.onclick = (e) => {
+          e.stopPropagation();
+          // Salva la configurazione selezionata come attiva
+          localStorage.setItem('customButtons', JSON.stringify(cfg.buttons));
+          if (typeof cfg.systemPrompt === 'string') {
+            localStorage.setItem('systemPrompt', cfg.systemPrompt);
+          }
+          alert('Configurazione caricata! Torna alla pagina principale.');
+          window.location.href = 'custom_gpt_buttons.html';
+          menu.classList.remove('active');
+        };
+        menu.appendChild(loadBtn);
+        // Chiudi menu cliccando fuori
+        document.addEventListener('click', function closeMenu(e) {
+          if (!menu.contains(e.target) && !dotsBtn.contains(e.target)) {
+            menu.classList.remove('active');
+            document.removeEventListener('click', closeMenu);
+          }
+        });
+        actions.appendChild(menu);
+        card.appendChild(actions);
+        list.appendChild(card);
+      });
+    }
+    // Importa configurazione da file
+    document.getElementById('importConfigBtn').onclick = function() {
+      document.getElementById('importConfigInput').click();
+    };
+    document.getElementById('importConfigInput').onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const imported = JSON.parse(evt.target.result);
+          let buttons, systemPrompt;
+          if (imported && Array.isArray(imported.buttons) && imported.buttons.every(b => b.name && b.prompt)) {
+            buttons = imported.buttons;
+            systemPrompt = imported.systemPrompt || '';
+          } else if (Array.isArray(imported) && imported.every(b => b.name && b.prompt)) {
+            buttons = imported;
+            systemPrompt = '';
+          } else {
+            alert('File non valido.');
+            return;
+          }
+          const title = prompt('Titolo per la configurazione importata:', 'Configurazione importata');
+          if (!title) return;
+          const desc = prompt('Descrizione (facoltativa):', '');
+          const configs = getSavedConfigs();
+          configs.push({ title, desc, buttons, systemPrompt });
+          saveConfigs(configs);
+          renderConfigs();
+          alert('Configurazione importata e salvata!');
+        } catch (err) {
+          alert('Errore durante l\'importazione: ' + err.message);
+        }
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    };
+    // Inizializza
+    renderConfigs();
+  </script>
+</body>
+</html>

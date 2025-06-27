@@ -123,6 +123,35 @@
             color: #fff;
             z-index: 1000;
         }
+
+        /* Stili per la modale di salvataggio configurazione */
+        #saveConfigModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(44,39,53,0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        #saveConfigModal > div {
+            background: #fff;
+            color: #2C2735;
+            padding: 2em 1.5em 1.5em 1.5em;
+            border-radius: 10px;
+            max-width: 95vw;
+            width: 400px;
+            box-shadow: 0 4px 24px #0003;
+            outline: 2px solid #E85D26;
+            position: relative;
+        }
+        #saveConfigModal h2 {
+            margin-top: 0;
+            color: #E85D26;
+        }
     </style>
 </head>
 
@@ -167,9 +196,24 @@
 
     <h2 id="custom-btns-heading">Configurazione pulsanti</h2>
     <div id="config-actions" style="margin-bottom:1em; display:flex; gap:10px; justify-content:center;">
-      <button id="exportConfigBtn" type="button">Esporta configurazione</button>
-      <button id="importConfigBtn" type="button">Importa configurazione</button>
-      <input id="importConfigInput" type="file" accept=".json,application/json" style="display:none;" />
+      <button id="openSaveConfigModalBtn" type="button" aria-label="Salva configurazione">Salva configurazione</button>
+      <a href="configurazioni.html"><button type="button" aria-label="Carica configurazione">Carica configurazione</button></a>
+    </div>
+    <!-- Modal per salvataggio configurazione -->
+    <div id="saveConfigModal" role="dialog" aria-modal="true" aria-labelledby="saveConfigTitle" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(44,39,53,0.7);z-index:2000;align-items:center;justify-content:center;">
+      <div style="background:#fff;color:#2C2735;padding:2em 1.5em 1.5em 1.5em;border-radius:10px;max-width:95vw;width:400px;box-shadow:0 4px 24px #0003;outline:2px solid #E85D26;position:relative;" tabindex="-1">
+        <h2 id="saveConfigTitle" style="margin-top:0;color:#E85D26;">Salva configurazione</h2>
+        <form id="saveConfigForm">
+          <label for="configTitle"><b>Titolo configurazione</b> <span style="color:#E85D26;">*</span></label>
+          <input id="configTitle" name="configTitle" required maxlength="60" autocomplete="off" style="margin-bottom:0.5em;">
+          <label for="configDesc">Descrizione (opzionale)</label>
+          <textarea id="configDesc" name="configDesc" rows="2" maxlength="120" style="margin-bottom:0.5em;"></textarea>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:1em;">
+            <button type="button" id="cancelSaveConfigBtn" style="background:#2C2735;">Annulla</button>
+            <button type="submit" style="background:#E85D26;">Salva</button>
+          </div>
+        </form>
+      </div>
     </div>
     <h3 id="create-btn-heading">Pulsanti personalizzati</h3>
     <div id="customButtons" aria-labelledby="custom-btns-heading"></div>
@@ -511,56 +555,70 @@
         }
 
         // --- Esporta/Importa configurazione bottoni personalizzati ---
-        const exportBtn = document.getElementById('exportConfigBtn');
-        const importBtn = document.getElementById('importConfigBtn');
-        const importInput = document.getElementById('importConfigInput');
-        exportBtn.onclick = function() {
-          const exportObj = {
-            systemPrompt: systemPromptInput.value,
-            buttons: customButtons
-          };
-          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
-          const dlAnchor = document.createElement('a');
-          dlAnchor.setAttribute("href", dataStr);
-          dlAnchor.setAttribute("download", "custom_gpt_buttons.json");
-          document.body.appendChild(dlAnchor);
-          dlAnchor.click();
-          document.body.removeChild(dlAnchor);
-        };
-        importBtn.onclick = function() {
-          importInput.click();
-        };
-        importInput.onchange = function(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = function(evt) {
-            try {
-              const imported = JSON.parse(evt.target.result);
-              if (imported && Array.isArray(imported.buttons) && imported.buttons.every(b => b.name && b.prompt)) {
-                customButtons = imported.buttons;
-                saveCustomButtons();
-                renderCustomButtons();
-                if (typeof imported.systemPrompt === 'string') {
-                  systemPromptInput.value = imported.systemPrompt;
-                  localStorage.setItem('systemPrompt', imported.systemPrompt);
-                }
-                alert('Configurazione importata con successo!');
-              } else if (Array.isArray(imported) && imported.every(b => b.name && b.prompt)) {
-                // Supporta vecchio formato solo array
-                customButtons = imported;
-                saveCustomButtons();
-                renderCustomButtons();
-                alert('Configurazione importata (vecchio formato)!');
-              } else {
-                alert('File non valido.');
-              }
-            } catch (err) {
-              alert('Errore durante l\'importazione: ' + err.message);
+        // RIMOSSO: export/import logic, now handled in configurazioni.html
+
+        // --- MODALE SALVA CONFIGURAZIONE ---
+        const openSaveConfigModalBtn = document.getElementById('openSaveConfigModalBtn');
+        const saveConfigModal = document.getElementById('saveConfigModal');
+        const saveConfigForm = document.getElementById('saveConfigForm');
+        const cancelSaveConfigBtn = document.getElementById('cancelSaveConfigBtn');
+        let lastFocusedElement = null;
+        function openSaveConfigModal() {
+          lastFocusedElement = document.activeElement;
+          saveConfigModal.style.display = 'flex';
+          document.body.style.overflow = 'hidden';
+          setTimeout(() => {
+            document.getElementById('configTitle').focus();
+          }, 100);
+        }
+        function closeSaveConfigModal() {
+          saveConfigModal.style.display = 'none';
+          document.body.style.overflow = '';
+          if (lastFocusedElement) lastFocusedElement.focus();
+        }
+        openSaveConfigModalBtn.onclick = openSaveConfigModal;
+        cancelSaveConfigBtn.onclick = closeSaveConfigModal;
+        saveConfigModal.addEventListener('click', function(e) {
+          if (e.target === saveConfigModal) closeSaveConfigModal();
+        });
+        document.addEventListener('keydown', function(e) {
+          if (saveConfigModal.style.display === 'flex' && e.key === 'Escape') {
+            closeSaveConfigModal();
+          }
+        });
+        // Focus trap
+        saveConfigModal.addEventListener('keydown', function(e) {
+          if (saveConfigModal.style.display !== 'flex') return;
+          const focusable = saveConfigModal.querySelectorAll('input, textarea, button');
+          const first = focusable[0], last = focusable[focusable.length-1];
+          if (e.key === 'Tab') {
+            if (e.shiftKey && document.activeElement === first) {
+              e.preventDefault(); last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+              e.preventDefault(); first.focus();
             }
-            importInput.value = '';
+          }
+        });
+        // Salva configurazione
+        saveConfigForm.onsubmit = function(e) {
+          e.preventDefault();
+          const title = document.getElementById('configTitle').value.trim();
+          const desc = document.getElementById('configDesc').value.trim();
+          if (!title) return;
+          // Prepara oggetto configurazione
+          const config = {
+            title,
+            description: desc,
+            systemPrompt: systemPromptInput.value,
+            buttons: customButtons.slice(0)
           };
-          reader.readAsText(file);
+          // Salva in localStorage (lista di configurazioni)
+          let configs = [];
+          try { configs = JSON.parse(localStorage.getItem('savedConfigs')||'[]'); } catch(e){}
+          configs.push(config);
+          localStorage.setItem('savedConfigs', JSON.stringify(configs));
+          closeSaveConfigModal();
+          alert('Configurazione salvata!');
         };
     </script>
     <footer style="position:fixed;left:0;right:0;bottom:0;background:#2C2735;border-top:2px solid #E85D26;padding:10px 0;text-align:center;font-size:0.95em;color:#fff;z-index:1000;">
