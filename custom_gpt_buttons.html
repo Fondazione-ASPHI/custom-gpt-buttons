@@ -56,10 +56,17 @@
       <div style="background:#fff;color:#2C2735;padding:2em 1.5em 1.5em 1.5em;border-radius:10px;max-width:95vw;width:400px;box-shadow:0 4px 24px #0003;outline:2px solid #E85D26;position:relative;" tabindex="-1">
         <h2 id="saveConfigTitle" style="margin-top:0;color:#E85D26;">Salva configurazione</h2>
         <form id="saveConfigForm">
-          <label for="configTitle"><b>Titolo configurazione</b> <span style="color:#E85D26;">*</span></label>
-          <input id="configTitle" name="configTitle" required maxlength="60" autocomplete="off" style="margin-bottom:0.5em;">
-          <label for="configDesc">Descrizione (opzionale)</label>
-          <textarea id="configDesc" name="configDesc" rows="2" maxlength="120" style="margin-bottom:0.5em;"></textarea>
+          <div id="saveConfigNewFields">
+            <label for="configTitle"><b>Titolo configurazione</b> <span style="color:#E85D26;">*</span></label>
+            <input id="configTitle" name="configTitle" required maxlength="60" autocomplete="off" style="margin-bottom:0.5em;">
+            <label for="configDesc">Descrizione (opzionale)</label>
+            <textarea id="configDesc" name="configDesc" rows="2" maxlength="120" style="margin-bottom:0.5em;"></textarea>
+          </div>
+          <div id="saveConfigOverwriteFields" style="display:none;">
+            <p>Stai usando la configurazione <b id="activeConfigName"></b>.<br>Vuoi sovrascriverla con lo stato attuale?</p>
+            <label for="configDescOverwrite">Descrizione (opzionale)</label>
+            <textarea id="configDescOverwrite" name="configDescOverwrite" rows="2" maxlength="120" style="margin-bottom:0.5em;"></textarea>
+          </div>
           <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:1em;">
             <button type="button" id="cancelSaveConfigBtn" style="background:#2C2735;">Annulla</button>
             <button type="submit" style="background:#E85D26;">Salva</button>
@@ -414,13 +421,43 @@
         const saveConfigModal = document.getElementById('saveConfigModal');
         const saveConfigForm = document.getElementById('saveConfigForm');
         const cancelSaveConfigBtn = document.getElementById('cancelSaveConfigBtn');
+        const saveConfigNewFields = document.getElementById('saveConfigNewFields');
+        const saveConfigOverwriteFields = document.getElementById('saveConfigOverwriteFields');
+        const activeConfigName = document.getElementById('activeConfigName');
         let lastFocusedElement = null;
         function openSaveConfigModal() {
           lastFocusedElement = document.activeElement;
+          const activeTitle = localStorage.getItem('activeConfigTitle');
+          const activeIndex = localStorage.getItem('activeConfigIndex');
+          const configTitleInput = document.getElementById('configTitle');
+          if (activeTitle) {
+            saveConfigNewFields.style.display = 'none';
+            saveConfigOverwriteFields.style.display = '';
+            activeConfigName.textContent = activeTitle;
+            let configs = [];
+            try { configs = JSON.parse(localStorage.getItem('savedConfigs')||'[]'); } catch(e){}
+            let idx = -1;
+            if (activeIndex !== null && !isNaN(Number(activeIndex))) {
+              idx = Number(activeIndex);
+            } else {
+              idx = configs.findIndex(cfg => cfg.title === activeTitle);
+            }
+            document.getElementById('configDescOverwrite').value = (idx !== -1 && configs[idx]) ? configs[idx].description || '' : '';
+            // Disabilita required su configTitle quando in overwrite
+            if (configTitleInput) configTitleInput.required = false;
+          } else {
+            saveConfigNewFields.style.display = '';
+            saveConfigOverwriteFields.style.display = 'none';
+            document.getElementById('configTitle').value = '';
+            document.getElementById('configDesc').value = '';
+            // Abilita required su configTitle quando in nuovo salvataggio
+            if (configTitleInput) configTitleInput.required = true;
+          }
           saveConfigModal.style.display = 'flex';
           document.body.style.overflow = 'hidden';
           setTimeout(() => {
-            document.getElementById('configTitle').focus();
+            if (!activeTitle) document.getElementById('configTitle').focus();
+            else document.getElementById('configDescOverwrite').focus();
           }, 100);
         }
         function closeSaveConfigModal() {
@@ -454,23 +491,60 @@
         // Salva configurazione
         saveConfigForm.onsubmit = function(e) {
           e.preventDefault();
-          const title = document.getElementById('configTitle').value.trim();
-          const desc = document.getElementById('configDesc').value.trim();
-          if (!title) return;
-          // Prepara oggetto configurazione
-          const config = {
-            title,
-            description: desc,
-            systemPrompt: systemPromptInput.value,
-            buttons: customButtons.slice(0)
-          };
-          // Salva in localStorage (lista di configurazioni)
-          let configs = [];
-          try { configs = JSON.parse(localStorage.getItem('savedConfigs')||'[]'); } catch(e){}
-          configs.push(config);
-          localStorage.setItem('savedConfigs', JSON.stringify(configs));
-          closeSaveConfigModal();
-          alert('Configurazione salvata!');
+          try {
+            const activeTitle = localStorage.getItem('activeConfigTitle');
+            const activeIndex = localStorage.getItem('activeConfigIndex');
+            let configs = [];
+            try { configs = JSON.parse(localStorage.getItem('savedConfigs')||'[]'); } catch(e){}
+            if (activeTitle) {
+              // OVERWRITE MODE
+              const newDesc = document.getElementById('configDescOverwrite').value.trim();
+              const newConfig = {
+                title: activeTitle,
+                description: newDesc,
+                systemPrompt: systemPromptInput.value,
+                buttons: customButtons.slice(0)
+              };
+              let idx = -1;
+              if (activeIndex !== null && !isNaN(Number(activeIndex))) {
+                idx = Number(activeIndex);
+              } else {
+                idx = configs.findIndex(cfg => cfg.title === activeTitle);
+              }
+              if (idx !== -1 && configs[idx]) {
+                configs[idx] = newConfig;
+                localStorage.setItem('activeConfigIndex', idx);
+              } else {
+                configs.push(newConfig);
+                localStorage.setItem('activeConfigIndex', configs.length - 1);
+              }
+              localStorage.setItem('savedConfigs', JSON.stringify(configs));
+              // Aggiorna anche il titolo attivo (robustezza)
+              localStorage.setItem('activeConfigTitle', activeTitle);
+              closeSaveConfigModal();
+              setTimeout(() => alert('Configurazione aggiornata!'), 100);
+              return;
+            }
+            // NUOVO SALVATAGGIO
+            const title = document.getElementById('configTitle').value.trim();
+            const desc = document.getElementById('configDesc').value.trim();
+            if (!title) return;
+            const config = {
+              title,
+              description: desc,
+              systemPrompt: systemPromptInput.value,
+              buttons: customButtons.slice(0)
+            };
+            configs.push(config);
+            localStorage.setItem('savedConfigs', JSON.stringify(configs));
+            localStorage.setItem('activeConfigTitle', title);
+            localStorage.setItem('activeConfigIndex', configs.length - 1);
+            closeSaveConfigModal();
+            setTimeout(() => alert('Configurazione salvata!'), 100);
+          } catch (err) {
+            closeSaveConfigModal();
+            setTimeout(() => alert('Errore nel salvataggio configurazione: ' + err), 100);
+          }
         };
     </script>
     <footer>

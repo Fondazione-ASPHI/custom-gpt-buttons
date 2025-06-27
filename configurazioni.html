@@ -103,18 +103,30 @@
           if (typeof cfg.systemPrompt === 'string') {
             localStorage.setItem('systemPrompt', cfg.systemPrompt);
           }
+          localStorage.setItem('activeConfigTitle', cfg.title || '');
           alert('Configurazione caricata! Torna alla pagina principale.');
           window.location.href = 'custom_gpt_buttons.html';
           menu.classList.remove('active');
         };
         menu.appendChild(loadBtn);
-        // Chiudi menu cliccando fuori
-        document.addEventListener('click', function closeMenu(e) {
-          if (!menu.contains(e.target) && !dotsBtn.contains(e.target)) {
-            menu.classList.remove('active');
-            document.removeEventListener('click', closeMenu);
+        // Elimina
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Elimina';
+        deleteBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (confirm('Vuoi davvero eliminare questa configurazione?')) {
+            let configs = getSavedConfigs();
+            configs.splice(idx, 1);
+            saveConfigs(configs);
+            // Se era la configurazione attiva, rimuovi anche activeConfigTitle
+            if (localStorage.getItem('activeConfigTitle') === cfg.title) {
+              localStorage.removeItem('activeConfigTitle');
+            }
+            renderConfigs();
           }
-        });
+          menu.classList.remove('active');
+        };
+        menu.appendChild(deleteBtn);
         actions.appendChild(menu);
         card.appendChild(actions);
         list.appendChild(card);
