@@ -50,6 +50,7 @@
     <div id="config-actions" style="margin-bottom:1em; display:flex; gap:10px; justify-content:center;">
       <button id="openSaveConfigModalBtn" type="button" aria-label="Salva configurazione">Salva configurazione</button>
       <a href="configurazioni.html"><button type="button" aria-label="Carica configurazione">Carica configurazione</button></a>
+      <button id="newConfigBtn" type="button" aria-label="Nuova configurazione">Nuova configurazione</button>
     </div>
     <!-- Modal per salvataggio configurazione -->
     <div id="saveConfigModal" role="dialog" aria-modal="true" aria-labelledby="saveConfigTitle" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(44,39,53,0.7);z-index:2000;align-items:center;justify-content:center;">
@@ -425,6 +426,20 @@
         const saveConfigOverwriteFields = document.getElementById('saveConfigOverwriteFields');
         const activeConfigName = document.getElementById('activeConfigName');
         let lastFocusedElement = null;
+        // --- NUOVA CONFIGURAZIONE ---
+        const newConfigBtn = document.getElementById('newConfigBtn');
+        newConfigBtn.onclick = function() {
+          if (confirm('Vuoi davvero creare una nuova configurazione? Quella attiva verrà chiusa e i dati correnti saranno azzerati.')) {
+            localStorage.removeItem('activeConfigTitle');
+            localStorage.removeItem('activeConfigIndex');
+            localStorage.setItem('systemPrompt', "Sei un assistente visivo che aiuta l'utente a interpretare immagini tramite GPT.");
+            systemPromptInput.value = localStorage.getItem('systemPrompt');
+            customButtons = [];
+            saveCustomButtons();
+            renderCustomButtons();
+            alert('Nuova configurazione avviata!');
+          }
+        };
         function openSaveConfigModal() {
           lastFocusedElement = document.activeElement;
           const activeTitle = localStorage.getItem('activeConfigTitle');
