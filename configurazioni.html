@@ -9,7 +9,7 @@
   <h1>Le mie configurazioni</h1>
   <div class="container">
     <div class="back-btn">
-      <button onclick="window.location.href='custom_gpt_buttons.html'">← Torna alla pagina principale</button>
+      <button onclick="window.location.href='index.html'">← Torna alla pagina principale</button>
     </div>
     <div class="import-btn">
       <button id="importConfigBtn" type="button">Importa configurazione</button>
@@ -105,7 +105,7 @@
           }
           localStorage.setItem('activeConfigTitle', cfg.title || '');
           alert('Configurazione caricata! Torna alla pagina principale.');
-          window.location.href = 'custom_gpt_buttons.html';
+          window.location.href = 'index.html';
           menu.classList.remove('active');
         };
         menu.appendChild(loadBtn);
